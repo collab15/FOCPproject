@@ -8,6 +8,8 @@ QRticketingSystem.sln/
 QRticketingSystem.vcxproj/
 QRticketingSystem.vcxproj.filters/
 
+out/
+
 # Build folders and binaries
 *.exe
 *.obj
