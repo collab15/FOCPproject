@@ -9,9 +9,6 @@ QRticketingSystem.vcxproj/
 QRticketingSystem.vcxproj.filters/
 
 # Build folders and binaries
-build/
-bin/
-lib/
 *.exe
 *.obj
 *.log

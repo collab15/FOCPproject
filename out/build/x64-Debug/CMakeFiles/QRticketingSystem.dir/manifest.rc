@@ -1,0 +1,2 @@
+#pragma code_page(65001)
+1 /* CREATEPROCESS_MANIFEST_RESOURCE_ID */ 24 /* RT_MANIFEST */ "E:/uni Projects/QRticketingSystem/out/build/x64-Debug/CMakeFiles/QRticketingSystem.dir/embed.manifest"
