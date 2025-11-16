@@ -1,0 +1,21 @@
+# Visual Studio
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+QRticketingSystem.sln/
+QRticketingSystem.vcxproj/
+QRticketingSystem.vcxproj.filters/
+
+# Build folders and binaries
+build/
+bin/
+lib/
+*.exe
+*.obj
+*.log
+QRticket.a65f74b3/
+
+# vcpkg packages / external dependencies
+external/
