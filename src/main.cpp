@@ -1,6 +1,7 @@
 #include <iostream>
 #include <drogon/drogon.h>
 #include "qrcodegen.hpp"
+#include "QRPDFGenerator.hpp"
 
 using namespace qrcodegen;
 
@@ -10,16 +11,13 @@ int main() {
     int myPort = 8080;
     std::cout << "\nServer is starting on http://127.0.0.1:" << myPort << " ..." << std::endl;
 
-    const char* text = "Hello World";
-    QrCode qr = QrCode::encodeText(text, QrCode::Ecc::MEDIUM);
-
-	std::cout << "\n\nQR Code for text: " << text << "\n\n";
-    // Print QR code in ASCII
-    for (int y = 0; y < qr.getSize(); y++) {
-        for (int x = 0; x < qr.getSize(); x++) {
-            std::cout << (qr.getModule(x, y) ? "##" : "  ");
-        }
-        std::cout << "\n";
+    try {
+		std::cout << "\nGenerating sample QR PDF 'ticket.pdf'..." << std::endl;
+        QRPDFGenerator::generatePDF("Hello QR!", "ticket.pdf");
+		std::cout << "Sample QR PDF 'ticket.pdf' generated successfully." << std::endl;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
     }
 
     // Minimal handler for "/test"
