@@ -1,11 +1,26 @@
-#include <drogon/drogon.h>
 #include <iostream>
+#include <drogon/drogon.h>
+#include "qrcodegen.hpp"
+
+using namespace qrcodegen;
 
 int main() {
     using namespace drogon;
 
     int myPort = 8080;
-    std::cout << "Server is starting on http://127.0.0.1:" << myPort << " ..." << std::endl;
+    std::cout << "\nServer is starting on http://127.0.0.1:" << myPort << " ..." << std::endl;
+
+    const char* text = "Hello World";
+    QrCode qr = QrCode::encodeText(text, QrCode::Ecc::MEDIUM);
+
+	std::cout << "\n\nQR Code for text: " << text << "\n\n";
+    // Print QR code in ASCII
+    for (int y = 0; y < qr.getSize(); y++) {
+        for (int x = 0; x < qr.getSize(); x++) {
+            std::cout << (qr.getModule(x, y) ? "##" : "  ");
+        }
+        std::cout << "\n";
+    }
 
     // Minimal handler for "/test"
     app().registerHandler("/test",

@@ -9,6 +9,15 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif()
 
+# QR Codegen (single-file library)
+add_library(qrcodegen STATIC
+    "${CMAKE_SOURCE_DIR}/dependencies/src/qrcodegen.cpp"
+)
+
+target_include_directories(qrcodegen PUBLIC
+    "${CMAKE_SOURCE_DIR}/dependencies/include"
+)
+
 # Include headers
 include_directories("${CMAKE_SOURCE_DIR}/dependencies/include")
 
@@ -23,6 +32,7 @@ add_executable(QRticketingSystem ${SOURCES})
 
 # Link libraries
 target_link_libraries(QRticketingSystem
+    qrcodegen
     drogon
     trantor
     libssl
