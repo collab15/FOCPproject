@@ -80,6 +80,7 @@ add_custom_command(TARGET QRticketingSystem POST_BUILD
         "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/brotlienc.dll"
         "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/brotlidec.dll"
         "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/brotlicommon.dll"
-	"${CMAKE_SOURCE_DIR}/dependencies/debug/bin/hpdf.dll"
+	    "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/hpdf.dll"
+	    "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/libpng16d.dll"
         $<TARGET_FILE_DIR:QRticketingSystem>
 )
