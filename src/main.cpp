@@ -12,7 +12,7 @@ int main() {
     std::cout << "\nServer is starting on http://127.0.0.1:" << myPort << " ..." << std::endl;
 
     try {
-		std::cout << "\nGenerating sample QR PDF 'ticket.pdf'..." << std::endl;
+		std::cout << "\nGenerating sample QR-PDF 'ticket.pdf'..." << std::endl;
         QRPDFGenerator::generatePDF("Hello QR!", "ticket.pdf");
 		std::cout << "Sample QR PDF 'ticket.pdf' generated successfully." << std::endl;
     }
