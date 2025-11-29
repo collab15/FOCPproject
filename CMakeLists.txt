@@ -52,7 +52,7 @@ add_executable(QRticketingSystem ${SOURCES})
 # -----------------------------
 target_link_libraries(QRticketingSystem
     qrcodegen
-    hpdf          # static LibHaru
+    hpdf
     drogon
     trantor
     libssl
@@ -63,6 +63,7 @@ target_link_libraries(QRticketingSystem
     brotlienc
     brotlidec
     brotlicommon
+    libpq         # PostgreSQL client library
 )
 
 # -----------------------------
@@ -80,7 +81,8 @@ add_custom_command(TARGET QRticketingSystem POST_BUILD
         "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/brotlienc.dll"
         "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/brotlidec.dll"
         "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/brotlicommon.dll"
-	    "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/hpdf.dll"
-	    "${CMAKE_SOURCE_DIR}/dependencies/bin/libpng16d.dll"
+        "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/hpdf.dll"
+        "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/libpq.dll"      # PostgreSQL DLL
+        "${CMAKE_SOURCE_DIR}/dependencies/debug/bin/libpng16d.dll"
         $<TARGET_FILE_DIR:QRticketingSystem>
 )
