@@ -21,7 +21,7 @@ int main() {
 
     // Initialize DB (throws runtime_error on connection failure)
 
-    PostgresDB db("postgresql://postgres:NoorHuda123@aws-1-ap-south-1.pooler.supabase.com:5432/postgres");
+    PostgresDB db("postgresql://postgres.izjgblghemuroxvptbql:NoorHuda123@aws-1-ap-south-1.pooler.supabase.com:5432/postgres");
 
 
     // Prepare insert statement once (throws on failure)
