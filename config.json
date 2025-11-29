@@ -1,0 +1,11 @@
+{
+  "db_clients": [
+    {
+      "name": "pg",
+      "rdbms": "postgresql",
+      "dbname": "postgres",
+      "conninfo": "postgresql://postgres:NoorHuda123@db.izjgblghemuroxvptbql.supabase.co:5432/postgres",
+      "connection_number": 5
+    }
+  ]
+}

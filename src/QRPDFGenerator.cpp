@@ -4,14 +4,17 @@
 #include <stdexcept>
 
 using namespace qrcodegen;
+using std::string;
+using std::runtime_error;
 
-void QRPDFGenerator::generatePDF(const std::string& text, const std::string& filename) {
+
+void QRPDFGenerator::generatePDF(const string& text, const string& filename) {
     // Generate QR code
     QrCode qr = QrCode::encodeText(text.c_str(), QrCode::Ecc::LOW);
 
     // Create PDF
     HPDF_Doc pdf = HPDF_New(nullptr, nullptr);
-    if (!pdf) throw std::runtime_error("Failed to create PDF document");
+    if (!pdf) throw runtime_error("Failed to create PDF document");
 
     HPDF_Page page = HPDF_AddPage(pdf);
     HPDF_Page_SetWidth(page, 300);
