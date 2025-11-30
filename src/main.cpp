@@ -14,6 +14,7 @@ using std::cerr;
 using std::endl;
 using std::function;
 using std::runtime_error;
+using std::exception;
 
 int main() {
     const int myPort = 8080;
@@ -53,11 +54,18 @@ int main() {
                 //string name = (*json)["name"].asString();
                 //string venue = (*json)["venue"].asString();
 
-                string eventId = generate_uuid();
-                cout << "Generated UUID: " << eventId << endl;
+                string name = req->getParameter("name");
+                string venue = req->getParameter("venue");
 
-                string name = "Event Name";
-				string venue = "Event Venue";
+                if (name.empty() || venue.empty()) {
+                    resp->setStatusCode(k400BadRequest);
+                    resp->setBody("Missing 'name' or 'venue'");
+                    callback(resp);
+                    return;
+                }
+
+
+                string eventId = generate_uuid();
 
                 // Insert into DB (throws on failure)
                 try {
@@ -67,23 +75,24 @@ int main() {
                     resp->setStatusCode(k500InternalServerError);
                     resp->setBody(string("Event Creation failed: ") + e.what());
                     callback(resp);
+                    return;
                 }
 
-                // Generate QR-PDF (throws on failure)
-                try {
-                    QRPDFGenerator::generatePDF(eventId, "ticket.pdf");
+                try{
+					QRPDFGenerator::generatePDF(eventId, name, venue, "ticket.pdf");
                 }
-                catch (const runtime_error& e) {
+                catch(const runtime_error& e){
                     resp->setStatusCode(k500InternalServerError);
-                    resp->setBody(string("QR-PDF generation failed: ") + e.what());
+                    resp->setBody(string("Ticket Creation failed: ") + e.what());
                     callback(resp);
+                    return;
                 }
 
                 // Success
                 resp->setStatusCode(k200OK);
-                resp->setBody("Event created successfully! QR-PDF generated: ");
+                resp->setBody("Event created successfully! \nEventId: " + eventId);
             }
-            catch (const std::exception& e) {
+            catch (const exception& e) {
                 // Catch any unexpected exception
                 resp->setStatusCode(k500InternalServerError);
                 resp->setBody(string("Internal Server error: ") + e.what());

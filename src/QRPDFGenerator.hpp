@@ -5,5 +5,5 @@ class QRPDFGenerator {
 public:
     // Generates a PDF file with a QR code containing the given text
     // filename: path to save the PDF
-    static void generatePDF(const std::string& text, const std::string& filename);
+    static void generatePDF(const std::string& id, const std::string& name, const std::string& venue, const std::string& filename);
 };
