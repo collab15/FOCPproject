@@ -280,7 +280,7 @@ int main() {
                 return;
             }
             
-            int userId = (*json)["id"].asInt();
+            string userId = (*json)["id"].asString();
             res["success"] = true;
 
             // Query events for this user
