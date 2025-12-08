@@ -1,0 +1,4 @@
+D:/FOCPproject/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/CMakeFiles/qrcodegen.dir
+D:/FOCPproject/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/CMakeFiles/QRticketingSystem.dir
+D:/FOCPproject/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/CMakeFiles/edit_cache.dir
+D:/FOCPproject/build/Desktop_Qt_6_10_1_MinGW_64_bit-Debug/CMakeFiles/rebuild_cache.dir

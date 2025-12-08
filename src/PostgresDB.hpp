@@ -76,6 +76,7 @@ public:
         conn = PQconnectdb(conninfo.c_str());
         if (!conn || PQstatus(conn) != CONNECTION_OK) {
             std::string msg = "Connection failed: " + std::string(PQerrorMessage(conn));
+            std::cout << msg << std::endl;
             if (conn) PQfinish(conn);
             throw std::runtime_error(msg);
         }

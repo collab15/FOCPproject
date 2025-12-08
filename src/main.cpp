@@ -15,6 +15,7 @@ using std::endl;
 using std::function;
 using std::runtime_error;
 using std::exception;
+using drogon::app;
 
 int main() {
     const int myPort = 8080;
@@ -27,7 +28,9 @@ int main() {
 
     // Prepare insert statement once (throws on failure)
     try {
-        db.prepareStatement("insertEvent", "INSERT INTO events (event_id, name, venue, created_at,date, time, optional_details, organization_id) VALUES ($1, $2, $3 ,$4,$5,$6,$7,$8);", 3);
+        db.prepareStatement("insertEvent",
+            "INSERT INTO events (event_id, name, venue, date, time, optional_details, organization_id) VALUES ($1, $2, $3 ,$4,$5,$6,$7);",
+            7);
         cout << "Prepared statement successfully." << endl;
     }
     catch (const runtime_error& e) {
@@ -35,8 +38,67 @@ int main() {
         return 1;  // Stop program
     }
 
+    try {
+        db.prepareStatement(
+            "verifyOrg",
+            "SELECT organization_id FROM organizations WHERE username = $1 AND password = $2;",
+            2
+        );
+    }
+    catch (const runtime_error& e) {
+        cerr << "Failed to prepare statement: " << e.what() << endl;
+        return 1;
+    }
+
+    try {
+        db.prepareStatement("insertTicket",
+            "INSERT INTO tickets (id, name, email, event_id, expiry) VALUES ($1, $2, $3, $4, $5);",
+            5);
+        cout << "Prepared statement successfully." << endl;
+    }
+    catch (const runtime_error& e) {
+        cerr << "Failed to prepare statement: " << e.what() << endl;
+        return 1;
+    }
+
+    try {
+        db.prepareStatement("scanTicket",
+            "SELECT status from tickets WHERE id = $1",
+            1);
+        cout << "Prepared statement successfully." << endl;
+    }
+    catch (const runtime_error& e) {
+        cerr << "Failed to prepare statement: " << e.what() << endl;
+        return 1;
+    }
+
+    try {
+        db.prepareStatement("redeemTicket",
+            "UPDATE tickets SET status = 'redeemed' WHERE id = $1",
+            1);
+        cout << "Prepared statement successfully." << endl;
+    }
+    catch (const runtime_error& e) {
+        cerr << "Failed to prepare statement: " << e.what() << endl;
+        return 1;
+    }
+
+    try {
+        db.prepareStatement(
+            "getUserEvents",
+            "SELECT id, name FROM events WHERE user_id = $1",
+            1
+        );
+        cout << "Prepared statement successfully." << endl;
+    }
+    catch (const runtime_error& e) {
+        cerr << "Failed to prepare statement: " << e.what() << endl;
+        return 1;
+    }
+
+
     // Route: /create-event
-    drogon::app().registerHandler(
+    app().registerHandler(
         "/create-event",
         [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
             auto resp = HttpResponse::newHttpResponse();
@@ -62,13 +124,7 @@ int main() {
                 string username = req->getParameter("username");
                 string password = req->getParameter("password");
 
-                db.prepareStatement(
-                    "getOrg",
-                    "SELECT organization_id FROM organizations WHERE username = $1 AND password = $2;",
-                    2
-                );
-
-                auto rows = db.execPrepared("getOrg", { username, password });
+                auto rows = db.execPrepared("verifyOrg", { username, password });
 
                 if (rows.empty()) {
                     resp->setStatusCode(k401Unauthorized);
@@ -76,7 +132,7 @@ int main() {
                     return;
                 }
 
-                std::string orgId = rows[0][0];
+                string orgId = rows[0][0];
 
           
 
@@ -119,19 +175,8 @@ int main() {
             callback(resp);
         }
     );
-
     
-    try {
-        db.prepareStatement("insertTicket", "INSERT INTO tickets (id, name, email, event_id, expiry) VALUES ($1, $2, $3, $4, $5);", 5);
-        cout << "Prepared statement successfully." << endl;
-    }
-    catch (const runtime_error& e) {
-        cerr << "Failed to prepare statement: " << e.what() << endl;
-        return 1; 
-    }
-
-    
-    drogon::app().registerHandler(
+    app().registerHandler(
         "/create-ticket",
         [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
             auto resp = HttpResponse::newHttpResponse();
@@ -187,7 +232,124 @@ int main() {
         }
     );
 
-    drogon::app().registerHandler(
+    app().registerHandler(
+        "/auth",
+        [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
+            
+            auto json = req->getJsonObject();
+            Json::Value res;
+
+            if (!json || !(*json)["username"].isString() || !(*json)["password"].isString()) {
+                res["success"] = false;
+                res["error"] = "Invalid JSON";
+                callback(HttpResponse::newHttpJsonResponse(res));
+            }
+
+            string username = (*json)["username"].asString();
+            string password = (*json)["password"].asString();
+
+            auto rows = db.execPrepared("verifyOrg", { username, password });
+
+            if (rows.empty()) {
+                res["success"] = false;
+                res["error"] = "Incorrect credentials";
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
+            }
+
+            string orgId = rows[0][0];
+
+            res["success"] = true;
+            res["id"] = orgId;
+
+            callback(HttpResponse::newHttpJsonResponse(res));
+        }
+    );
+
+    // ---- Events route ----
+    app().registerHandler(
+        "/mobile/events",
+        [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
+            auto json = req->getJsonObject();
+            Json::Value res;
+
+            if (!json || !(*json)["id"].isInt()) {
+                res["success"] = false;
+                res["error"] = "No user ID provided";
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
+            }
+            
+            int userId = (*json)["id"].asInt();
+            res["success"] = true;
+
+            // Query events for this user
+            auto rows = db.execPrepared("getUserEvents", { userId });
+
+            Json::Value events(Json::arrayValue);
+            for (auto& row : rows) {
+                Json::Value e;
+                e["id"] = std::stoi(row[0]);      // event id
+                e["name"] = row[1];                // event name
+                events.append(e);
+            }
+
+            res["events"] = events;
+            
+
+            callback(HttpResponse::newHttpJsonResponse(res));
+        
+        }
+    );
+
+    // ---- Ticket scan route ----
+    app().registerHandler(
+        "/scan",
+        [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
+            auto json = req->getJsonObject();
+            Json::Value res;
+
+            if (!json || !(*json)["eventId"].isInt() || !(*json)["ticketId"].isString()) {
+                res["result_status"] = "error";
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
+            }
+
+            string ticketId = (*json)["ticketId"].asString();
+
+            auto rows = db.execPrepared("scanTicket", { ticketId });
+
+            if (rows.empty()) {
+                res["result_status"] = "noExist";
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
+            }
+
+            string ticketStatus = rows[0][0];
+
+            if (ticketStatus == "active") {
+
+                try {
+                    db.execPreparedCommand("redeemTicket", { ticketId });
+                    res["result_status"] = "redeemed";
+                }
+                catch (const std::runtime_error&) {
+                    res["result_status"] = "error";
+                }
+            }
+            else if (ticketStatus == "expired") {
+                res["result_status"] = "expired";
+            }
+            else {
+                res["result_status"] = "noExist";
+            }
+            
+
+            callback(HttpResponse::newHttpJsonResponse(res));
+        }
+    );
+
+    /*drogon::app().registerHandler(
         "/create-ticket",
         [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
             auto resp = HttpResponse::newHttpResponse();
@@ -202,7 +364,7 @@ int main() {
 
             callback(resp);
         }
-    );
+    );*/
 
     drogon::app().addListener("0.0.0.0", myPort);
     drogon::app().run();
