@@ -29,8 +29,9 @@ int main() {
     // Prepare insert statement once (throws on failure)
     try {
         db.prepareStatement("insertEvent",
-            "INSERT INTO events (event_id, name, venue, date, time, optional_details, organization_id) VALUES ($1, $2, $3 ,$4,$5,$6,$7);",
-            7);
+            "INSERT INTO events (id, name, venue, expires_at, optional_details, organization_id, starts_at, ends_at) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8);",
+            8);
         cout << "Prepared statement successfully." << endl;
     }
     catch (const runtime_error& e) {
@@ -41,7 +42,7 @@ int main() {
     try {
         db.prepareStatement(
             "verifyOrg",
-            "SELECT organization_id FROM organizations WHERE username = $1 AND password = $2;",
+            "SELECT id FROM organizations WHERE username = $1 AND password = $2;",
             2
         );
     }
@@ -86,7 +87,7 @@ int main() {
     try {
         db.prepareStatement(
             "getUserEvents",
-            "SELECT id, name FROM events WHERE user_id = $1",
+            "SELECT id, name FROM events WHERE id = $1",
             1
         );
         cout << "Prepared statement successfully." << endl;
@@ -101,80 +102,82 @@ int main() {
     app().registerHandler(
         "/create-event",
         [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
-            auto resp = HttpResponse::newHttpResponse();
 
+            auto json = req->getJsonObject();
+            Json::Value res;
+
+            // Validate JSON body
+            if (!json ||
+                !(*json)["username"].isString() ||
+                !(*json)["password"].isString() ||
+                !(*json)["name"].isString() ||
+                !(*json)["venue"].isString() ||
+                !(*json)["starts_at"].isString() ||
+                !(*json)["ends_at"].isString() ||
+                !(*json)["expires_at"].isString() ||
+                !(*json)["optional_details"].isString())
+            {
+                res["success"] = false;
+                res["error"] = "Invalid or missing JSON fields";
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
+            }
+
+            // Extract JSON fields
+            string username = (*json)["username"].asString();
+            string password = (*json)["password"].asString();
+            string eventName = (*json)["name"].asString();
+            string venue = (*json)["venue"].asString();
+            string startsAt = (*json)["starts_at"].asString();
+            string endsAt = (*json)["ends_at"].asString();
+            string expiresAt = (*json)["expires_at"].asString();
+            string optionalDetails = (*json)["optional_details"].asString();
+
+            // Verify organization
+            auto rows = db.execPrepared("verifyOrg", { username, password });
+
+            if (rows.empty()) {
+                res["success"] = false;
+                res["error"] = "Incorrect credentials";
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
+            }
+
+            string orgId = rows[0][0];
+
+            // Generate event UUID
+            string eventId = generate_uuid();
+
+            // Insert event
             try {
-                // Extract POST parameters
-                //auto json = req->getJsonObject();
-                //if (!json || !(*json)["name"].isString() || !(*json)["venue"].isString()) {
-                //    resp->setStatusCode(k400BadRequest);
-                //    resp->setBody("Missing or invalid 'name' or 'venue'");
-                //    callback(resp);
-                //    return;
-                //}
-
-                //string name = (*json)["name"].asString();
-                //string venue = (*json)["venue"].asString();
-
-               
-                string venue = req->getParameter("venue");
-                string time = req->getParameter("time");
-                string date = req->getParameter("date");
-                string optional_details = req->getParameter("optional_details");
-                string username = req->getParameter("username");
-                string password = req->getParameter("password");
-
-                auto rows = db.execPrepared("verifyOrg", { username, password });
-
-                if (rows.empty()) {
-                    resp->setStatusCode(k401Unauthorized);
-                    resp->setBody("Invalid organization name or password");
-                    return;
-                }
-
-                string orgId = rows[0][0];
-
-          
-
-                
-               
-
-                if (username.empty() || venue.empty() || time.empty() || date.empty() || optional_details.empty()) {
-                    resp->setStatusCode(k400BadRequest);
-                    resp->setBody("Missing detail'");
-                    callback(resp);
-                    return;
-
-                }
-
-
-                string eventId = generate_uuid();
-
-                // Insert into DB (throws on failure)
-                try {
-                    db.execPrepared("insertEvent", { eventId, username, venue, time, date, optional_details, orgId });
-                }
-                catch (const runtime_error& e) {
-                    resp->setStatusCode(k500InternalServerError);
-                    resp->setBody(string("Event Creation failed: ") + e.what());
-                    callback(resp);
-                    return;
-                }
-
-
-                // Success
-                resp->setStatusCode(k200OK);
-                resp->setBody("Event created successfully! \nEventId: " + eventId);
+                db.execPrepared("insertEvent",
+                    {
+                        eventId,
+                        eventName,
+                        venue,
+                        expiresAt,
+                        optionalDetails,
+                        orgId,
+                        startsAt,
+                        endsAt
+                    }
+                );
             }
-            catch (const exception& e) {
-                // Catch any unexpected exception
-                resp->setStatusCode(k500InternalServerError);
-                resp->setBody(string("Internal Server error: ") + e.what());
+            catch (const runtime_error& e) {
+                res["success"] = false;
+                res["error"] = string("Database error: ") + e.what();
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
             }
 
-            callback(resp);
+            // Success
+            res["success"] = true;
+            res["event_id"] = eventId;
+            callback(HttpResponse::newHttpJsonResponse(res));
         }
     );
+
+    
     
     app().registerHandler(
         "/create-ticket",
