@@ -46,8 +46,11 @@ namespace Utils {
         if (endTime < startTime)
             throw std::runtime_error("Event end date/time cannot be before start date/time");
 
-        if (expiryTime < endTime)
-            throw std::runtime_error("Event expiry date/time must be after the event ends");
+        if (expiryTime > endTime)
+            throw std::runtime_error("Event expiry date/time must be before the event ends");
+
+        if (expiryTime > now)
+            throw std::runtime_error("Event expiry date/time has already passed");
     }
 
     // Checks if a ticket can be created (event expiry is not passed)

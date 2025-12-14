@@ -331,6 +331,60 @@ int main() {
         }
     );
 
+    //app().registerHandler(
+    //    "/desktop/events",
+    //    [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
+    //        auto json = req->getJsonObject();
+    //        Json::Value res;
+
+    //        if (!json || !(*json)["organization_id"].isString()) {
+    //            res["success"] = false;
+    //            res["error"] = "Missing organization_id";
+    //            callback(HttpResponse::newHttpJsonResponse(res));
+    //            return;
+    //        }
+
+    //        string orgId = (*json)["organization_id"].asString();
+
+    //        // Get all events for this org
+    //        auto events = db.execPrepared("getOrgEventsForDesktop", { orgId });
+
+    //        Json::Value eventStatus(Json::objectValue);
+
+    //        for (auto& row : events) {
+    //            string eventId = row[0];
+
+    //            Json::Value eventData(Json::objectValue);
+
+    //            // Ticket stats
+    //            auto ticketRows = db.execPrepared("countTicketsByStatus", { eventId });
+    //            if (!ticketRows.empty()) {
+    //                eventData["total_tickets"] = std::stoi(ticketRows[0][3]);
+    //                eventData["active"] = std::stoi(ticketRows[0][0]);
+    //                eventData["redeemed"] = std::stoi(ticketRows[0][1]);
+    //                eventData["expired"] = std::stoi(ticketRows[0][2]);
+    //            }
+    //            else {
+    //                eventData["total_tickets"] = 0;
+    //                eventData["active"] = 0;
+    //                eventData["redeemed"] = 0;
+    //                eventData["expired"] = 0;
+    //            }
+
+    //            // Check if event expired
+    //            auto expiredRows = db.execPrepared("checkEventExpired", { eventId });
+    //            eventData["event_expired"] = (!expiredRows.empty() && expiredRows[0][0] == "t");
+
+    //            eventStatus[eventId] = eventData;
+    //        }
+
+    //        res["success"] = true;
+    //        res["events"] = eventStatus;
+
+    //        callback(HttpResponse::newHttpJsonResponse(res));
+    //    }
+    //);
+
     app().registerHandler(
         "/desktop/events",
         [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
@@ -349,12 +403,21 @@ int main() {
             // Get all events for this org
             auto events = db.execPrepared("getOrgEventsForDesktop", { orgId });
 
-            Json::Value eventStatus(Json::objectValue);
+            Json::Value eventArray(Json::arrayValue);
 
             for (auto& row : events) {
                 string eventId = row[0];
+                string eventName = row[1];
 
                 Json::Value eventData(Json::objectValue);
+                eventData["event_id"] = eventId;
+                eventData["name"] = eventName;
+
+                // Get venue from event details
+                auto detailRows = db.execPrepared("getEventDetails", { eventId });
+                if (!detailRows.empty()) {
+                    eventData["venue"] = detailRows[0][1]; // venue is second column
+                }
 
                 // Ticket stats
                 auto ticketRows = db.execPrepared("countTicketsByStatus", { eventId });
@@ -375,11 +438,11 @@ int main() {
                 auto expiredRows = db.execPrepared("checkEventExpired", { eventId });
                 eventData["event_expired"] = (!expiredRows.empty() && expiredRows[0][0] == "t");
 
-                eventStatus[eventId] = eventData;
+                eventArray.append(eventData);
             }
 
             res["success"] = true;
-            res["events"] = eventStatus;
+            res["events"] = eventArray;
 
             callback(HttpResponse::newHttpJsonResponse(res));
         }
