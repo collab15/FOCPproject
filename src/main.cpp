@@ -9,6 +9,7 @@
 #include "QRPDFGenerator.hpp"
 #include "PostgresDB.hpp"
 #include "uuid.hpp"
+#include <DateUtils.hpp>
 
 static std::time_t portable_timegm(std::tm* tm) {
 #if defined(_WIN32)
@@ -47,11 +48,14 @@ int main() {
         db.prepareStatement("verifyOrg",
             "SELECT id FROM organizations WHERE username = $1 AND password = $2;", 2);
 
+        db.prepareStatement("verifyStaff",
+            "SELECT id FROM staff WHERE username = $1 AND password = $2;", 2);
+
         db.prepareStatement("insertTicket",
-            "INSERT INTO tickets (id, event_id, expires_at) VALUES ($1,$2,$3);", 3);
+            "INSERT INTO tickets (id, event_id, name, expires_at) VALUES ($1,$2,$3, $4);", 4);
 
         db.prepareStatement("scanTicket",
-            "SELECT status, expires_at FROM tickets WHERE id = $1;", 1);
+            "SELECT status, expires_at, name FROM tickets WHERE id = $1 AND event_id = $2;", 2);
 
         db.prepareStatement("redeemTicket",
             "UPDATE tickets SET status='redeemed' WHERE id=$1;", 1);
@@ -61,6 +65,38 @@ int main() {
 
         db.prepareStatement("getEventDetails",
             "SELECT name, venue, optional_details, starts_at, ends_at, expires_at FROM events WHERE id=$1;", 1);
+
+        // Get all events for an organization
+        db.prepareStatement(
+            "getOrgEventsForDesktop",
+            "SELECT id, name FROM events WHERE organization_id = $1;", 1 );
+
+        // Count tickets grouped by status
+        db.prepareStatement(
+            "countTicketsByStatus",
+            R"(
+                SELECT 
+                    COUNT(*) FILTER (WHERE status='active') AS active_count,
+                    COUNT(*) FILTER (WHERE status='redeemed') AS redeemed_count,
+                    COUNT(*) FILTER (WHERE expires_at < NOW()) AS expired_count,
+                    COUNT(*) AS total_count
+                FROM tickets
+                WHERE event_id = $1;
+            )", 1 );
+
+        // Check if event expired
+        db.prepareStatement(
+            "checkEventExpired",
+            R"(
+                SELECT 
+                    CASE 
+                        WHEN ends_at < NOW() THEN TRUE
+                        ELSE FALSE
+                    END AS is_expired
+                FROM events
+                WHERE id = $1;
+            )", 1 );
+
 
         cout << "All prepared statements ready." << endl;
     }
@@ -112,6 +148,16 @@ int main() {
             }
             else {
                 optionalDetails = ""; // empty string represents NULL
+            }
+
+            try {
+                Utils::validateEventDates(startsAt, endsAt, expiresAt);
+            }
+            catch (const std::runtime_error& e) {
+                res["success"] = false;
+                res["error"] = e.what();
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
             }
 
 
@@ -171,6 +217,7 @@ int main() {
                 !(*json)["username"].isString() ||
                 !(*json)["password"].isString() ||
                 !(*json)["email"].isString() ||
+                !(*json)["name"].isString() ||
                 !(*json)["event_id"].isString()) {
                 res["success"] = false;
                 res["error"] = "Missing required fields";
@@ -180,6 +227,7 @@ int main() {
 
             string username = (*json)["username"].asString();
             string password = (*json)["password"].asString();
+			string name = (*json)["name"].asString();
             string email = (*json)["email"].asString();
             string eventId = (*json)["event_id"].asString();
 
@@ -212,6 +260,16 @@ int main() {
                 string ends_at = rows[0][4];
                 string expires_at = rows[0][5];
                 
+                try {
+                    Utils::validateTicketCreation(expires_at);
+                }
+                catch (const std::runtime_error& e) {
+                    res["success"] = false;
+                    res["error"] = e.what();
+                    callback(HttpResponse::newHttpJsonResponse(res));
+                    return;
+                }
+
 
                 try {
                     QRPDFGenerator::generatePDF(ticketId, event_name, venue, optional_details, starts_at, ends_at, "ticket.pdf");
@@ -223,7 +281,7 @@ int main() {
                     return;
                 }
 
-                db.execPrepared("insertTicket", { ticketId, eventId, expires_at });
+                db.execPrepared("insertTicket", { ticketId, eventId, name, expires_at });
 
                 res["success"] = true;
                 res["ticket_id"] = ticketId;
@@ -273,6 +331,61 @@ int main() {
         }
     );
 
+    app().registerHandler(
+        "/desktop/events",
+        [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
+            auto json = req->getJsonObject();
+            Json::Value res;
+
+            if (!json || !(*json)["organization_id"].isString()) {
+                res["success"] = false;
+                res["error"] = "Missing organization_id";
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
+            }
+
+            string orgId = (*json)["organization_id"].asString();
+
+            // Get all events for this org
+            auto events = db.execPrepared("getOrgEventsForDesktop", { orgId });
+
+            Json::Value eventStatus(Json::objectValue);
+
+            for (auto& row : events) {
+                string eventId = row[0];
+
+                Json::Value eventData(Json::objectValue);
+
+                // Ticket stats
+                auto ticketRows = db.execPrepared("countTicketsByStatus", { eventId });
+                if (!ticketRows.empty()) {
+                    eventData["total_tickets"] = std::stoi(ticketRows[0][3]);
+                    eventData["active"] = std::stoi(ticketRows[0][0]);
+                    eventData["redeemed"] = std::stoi(ticketRows[0][1]);
+                    eventData["expired"] = std::stoi(ticketRows[0][2]);
+                }
+                else {
+                    eventData["total_tickets"] = 0;
+                    eventData["active"] = 0;
+                    eventData["redeemed"] = 0;
+                    eventData["expired"] = 0;
+                }
+
+                // Check if event expired
+                auto expiredRows = db.execPrepared("checkEventExpired", { eventId });
+                eventData["event_expired"] = (!expiredRows.empty() && expiredRows[0][0] == "t");
+
+                eventStatus[eventId] = eventData;
+            }
+
+            res["success"] = true;
+            res["events"] = eventStatus;
+
+            callback(HttpResponse::newHttpJsonResponse(res));
+        }
+    );
+
+
     // ---- Ticket scan route ----
     app().registerHandler(
         "/scan",
@@ -280,15 +393,16 @@ int main() {
             auto json = req->getJsonObject();
             Json::Value res;
 
-            if (!json || !(*json)["ticketId"].isString()) {
+            if (!json || !(*json)["eventId"].isString() || !(*json)["ticketId"].isString()) {
                 res["result_status"] = "error";
                 callback(HttpResponse::newHttpJsonResponse(res));
                 return;
             }
 
             string ticketId = (*json)["ticketId"].asString();
+            string eventId = (*json)["eventId"].asString();
 
-            auto rows = db.execPrepared("scanTicket", { ticketId });
+            auto rows = db.execPrepared("scanTicket", { ticketId, eventId });
 
             if (rows.empty()) {
                 res["result_status"] = "noExist";
@@ -322,24 +436,73 @@ int main() {
             }
         
             string ticketStatus = isExpired ? "expired" : rows[0][0];
+			string name = rows[0][2];
 
             if (ticketStatus == "active") {
 
                 try {
-                    db.execPreparedCommand("redeemTicket", { ticketId });
-                    res["result_status"] = "redeemed";
+                    db.execPreparedCommand("redeemTicket", { ticketId});
+                    res["result_status"] = "Valid!";
+					res["name"] = name;
                 }
-                catch (const std::runtime_error&) {
-                    res["result_status"] = "error";
+                catch (const std::runtime_error& e) {
+                    res["result_status"] = "Some Error: Server side or in ticket data format";
+                    res["name"] = "Check Server logs";
                 }
+            }
+            else if (ticketStatus == "redeemed") {
+                res["result_status"] = "Already Redeemed!";
+                res["name"] = "___";
             }
             else if (ticketStatus == "expired") {
-                res["result_status"] = "expired";
+                res["result_status"] = "Expired";
+                res["name"] = "___";
             }
             else {
-                res["result_status"] = "noExist";
+                res["result_status"] = "Does not Exist";
+                res["name"] = "___";
             }
             
+
+            callback(HttpResponse::newHttpJsonResponse(res));
+        }
+    );
+
+    app().registerHandler(
+        "/org-auth",
+        [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
+            auto json = req->getJsonObject();
+            Json::Value res;
+
+            // Validate JSON body
+            if (!json || !(*json)["username"].isString() || !(*json)["password"].isString()) {
+                res["success"] = false;
+                res["error"] = "Invalid JSON or missing fields";
+                callback(HttpResponse::newHttpJsonResponse(res));
+                return;
+            }
+
+            string username = (*json)["username"].asString();
+            string password = (*json)["password"].asString();
+
+            try {
+                // Verify organization
+                auto rows = db.execPrepared("verifyOrg", { username, password });
+
+                if (rows.empty()) {
+                    res["success"] = false;
+                    res["error"] = "Incorrect credentials";
+                }
+                else {
+                    string orgId = rows[0][0];  // Already a string in your wrapper
+                    res["success"] = true;
+                    res["id"] = orgId;
+                }
+            }
+            catch (const runtime_error& e) {
+                res["success"] = false;
+                res["error"] = string("Database error: ") + e.what();
+            }
 
             callback(HttpResponse::newHttpJsonResponse(res));
         }
@@ -364,7 +527,7 @@ int main() {
 
             try {
                 // Verify organization
-                auto rows = db.execPrepared("verifyOrg", { username, password });
+                auto rows = db.execPrepared("verifyStaff", { username, password });
 
                 if (rows.empty()) {
                     res["success"] = false;
