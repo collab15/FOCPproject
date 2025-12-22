@@ -23,10 +23,10 @@ bool MailService::sendHtmlPdf(
 
     // replace locally with your SMTP key
     curl_easy_setopt(curl, CURLOPT_PASSWORD,
-        "REPLACE_WITH_YOUR_SMTP_KEY");
+        "bsklDki8wXes619");
 
     curl_easy_setopt(curl, CURLOPT_MAIL_FROM,
-        "<noreply@qtick.app>");
+        "<tickets@qtick.app>");
 
     recipients = curl_slist_append(recipients, to.c_str());
     curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
