@@ -26,7 +26,7 @@ bool MailService::sendHtmlPdf(
         "bsklDki8wXes619");
 
     curl_easy_setopt(curl, CURLOPT_MAIL_FROM,
-        "<tickets@qtick.app>");
+        "<project.collab.15@gmail.com>");
 
     recipients = curl_slist_append(recipients, to.c_str());
     curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
@@ -47,7 +47,7 @@ bool MailService::sendHtmlPdf(
 
     std::string subjectHeader = "Subject: " + subject;
     headers = curl_slist_append(headers, subjectHeader.c_str());
-    headers = curl_slist_append(headers, "From: QTick <noreply@qtick.app>");
+    headers = curl_slist_append(headers, "From: QTick <project.collab.15@gmail.com>");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     CURLcode res = curl_easy_perform(curl);

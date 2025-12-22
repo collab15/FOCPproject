@@ -261,6 +261,7 @@ int main() {
                 string starts_at = rows[0][3];
                 string ends_at = rows[0][4];
                 string expires_at = rows[0][5];
+				string ticket_pdf_path = "./tickets/ticket_" + ticketId + ".pdf";
                 
                 try {
                     Utils::validateTicketCreation(expires_at);
@@ -274,7 +275,7 @@ int main() {
 
 
                 try {
-                    QRPDFGenerator::generatePDF(ticketId, event_name, venue, optional_details, starts_at, ends_at, "ticket.pdf");
+                    QRPDFGenerator::generatePDF(ticketId, event_name, venue, optional_details, starts_at, ends_at, ticket_pdf_path);
                 }
                 catch (const exception& e) {
                     res["success"] = false;
@@ -286,20 +287,17 @@ int main() {
                 try {
                     auto html = loadHtmlTemplate("ticket_email.html");
 
-                    replaceAll(html, "{{name}}", "Ahmed");
-                    replaceAll(html, "{{event}}", "Tech Summit");
-                    replaceAll(html, "{{date}}", "12 Jan 2025");
-                    replaceAll(html, "{{venue}}", "NUST");
+                    replaceAll(html, "{{name}}", name);
+                    replaceAll(html, "{{event}}", event_name);
 
-                    // Async call to avoid blocking
-                    drogon::asyncTask([html] {
+					string subject = "Your QTick Ticket for " + event_name;
+
                         MailService::sendHtmlPdf(
                             email,
-                            "Your QTick Ticket",
+                            subject,
                             html,
-                            "./tickets/ticket_123.pdf"
+                            ticket_pdf_path
                         );
-                        });
 
                 }
                 catch (const exception& e) {
@@ -639,6 +637,50 @@ int main() {
         }
     );
 
+
+    /*app().registerHandler(
+        "/test",
+        [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
+            auto params = req->getParameters();
+            string name = params["name"];
+            string email = params["email"];
+            string event_name = "Sample Event 2024";
+
+            Json::Value res;
+
+            try {
+                auto html = loadHtmlTemplate("ticket_email.html");
+                replaceAll(html, "{{name}}", name);
+                replaceAll(html, "{{event}}", event_name);
+                string subject = "Your QTick Ticket for " + event_name;
+
+                bool success = MailService::sendHtmlPdf(
+                    email,
+                    subject,
+                    html,
+                    "./tickets/ticket.pdf"
+                );
+
+                if (success) {
+                    cout << "Email sent successfully to " << email << endl;
+                    res["success"] = true;
+                    res["message"] = "Email sent successfully";
+                }
+                else {
+                    cerr << "Failed to send email to " << email << endl;
+                    res["success"] = false;
+                    res["error"] = "Failed to send email";
+                }
+            }
+            catch (const exception& e) {
+                cerr << "Error: " << e.what() << endl;
+                res["success"] = false;
+                res["error"] = e.what();
+            }
+
+            callback(HttpResponse::newHttpJsonResponse(res));
+        }
+    );*/
 
 
     drogon::app().addListener("0.0.0.0", myPort);
