@@ -16,7 +16,7 @@ endif()
 # -----------------------------
 add_library(qrcodegen STATIC
     "${CMAKE_SOURCE_DIR}/dependencies/src/qrcodegen.cpp"
-)
+ "src/MailService.h" "src/MailService.cpp")
 
 target_include_directories(qrcodegen PUBLIC
     "${CMAKE_SOURCE_DIR}/dependencies/include"
@@ -45,7 +45,7 @@ file(GLOB SOURCES
 # -----------------------------
 # Build executable
 # -----------------------------
-add_executable(QRticketingSystem ${SOURCES})
+add_executable(QRticketingSystem ${SOURCES} "src/MailService.h" "src/MailService.cpp")
 
 # -----------------------------
 # Link libraries (static and DLL-based)

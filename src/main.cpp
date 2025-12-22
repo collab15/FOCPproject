@@ -9,6 +9,8 @@
 #include "QRPDFGenerator.hpp"
 #include "PostgresDB.hpp"
 #include "uuid.hpp"
+#include "MailService.h"
+#include "HtmlTemplate.h"
 #include <DateUtils.hpp>
 
 static std::time_t portable_timegm(std::tm* tm) {
@@ -281,6 +283,32 @@ int main() {
                     return;
                 }
 
+                try {
+                    auto html = loadHtmlTemplate("ticket_email.html");
+
+                    replaceAll(html, "{{name}}", "Ahmed");
+                    replaceAll(html, "{{event}}", "Tech Summit");
+                    replaceAll(html, "{{date}}", "12 Jan 2025");
+                    replaceAll(html, "{{venue}}", "NUST");
+
+                    // Async call to avoid blocking
+                    drogon::asyncTask([html] {
+                        MailService::sendHtmlPdf(
+                            email,
+                            "Your QTick Ticket",
+                            html,
+                            "./tickets/ticket_123.pdf"
+                        );
+                        });
+
+                }
+                catch (const exception& e) {
+                    res["success"] = false;
+                    res["error"] = "PDF ticket emailing failed Failed";
+                    callback(HttpResponse::newHttpJsonResponse(res));
+                    return;
+                }
+
                 db.execPrepared("insertTicket", { ticketId, eventId, name, expires_at });
 
                 res["success"] = true;
@@ -295,7 +323,7 @@ int main() {
         }
     );
 
-    // ---- Events route ----
+    
     app().registerHandler(
         "/mobile/events",
         [&db](const HttpRequestPtr& req, function<void(const HttpResponsePtr&)>&& callback) {
@@ -610,6 +638,8 @@ int main() {
             callback(HttpResponse::newHttpJsonResponse(res));
         }
     );
+
+
 
     drogon::app().addListener("0.0.0.0", myPort);
     drogon::app().run();

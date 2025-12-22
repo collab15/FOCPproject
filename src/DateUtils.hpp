@@ -19,11 +19,11 @@ namespace Utils {
             throw std::runtime_error("Invalid date format: " + datetime);
         }
 
-#if defined(_WIN32)
-        std::time_t tt = _mkgmtime(&tm);
-#else
-        std::time_t tt = timegm(&tm);
-#endif
+        #if defined(_WIN32)
+                std::time_t tt = _mkgmtime(&tm);
+        #else
+                std::time_t tt = timegm(&tm);
+        #endif
 
         return std::chrono::system_clock::from_time_t(tt);
     }
@@ -49,7 +49,7 @@ namespace Utils {
         if (expiryTime > endTime)
             throw std::runtime_error("Event expiry date/time must be before the event ends");
 
-        if (expiryTime > now)
+        if (expiryTime < now)
             throw std::runtime_error("Event expiry date/time has already passed");
     }
 
